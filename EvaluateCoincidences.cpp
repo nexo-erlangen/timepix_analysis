@@ -1,3 +1,8 @@
+// Copyright: Benedikt Bergmann
+// Setup gives .root-Files as output. This script includes tools to evaluate and analyze this data. Most things are made by Benedikt Bergmann, however Daniel may decide to add or restructure to enhance usability. Changes by him are marked as such by comment-lines.
+//To load, open a ROOT-session and type ".L EvaluateCoincidences.cpp". Now the fruits of our humble work are at your disposal! Use them wisely...
+
+
 using namespace std;
 
 void set_plot_style()
@@ -283,8 +288,12 @@ TH1F* PlotEnergySpectrum(std::string fn, int nbins = 1000, float xmin = 0, float
 }
 
 //Creates and saves the integrated energy spectrum
+//Daniel: Also introduces function to integrate over x-values. And prints histogram content into .dat-File
+int nlines_energy_tot = 1000;
+TH1F* h_tot = new TH1F("h_all", "Mn-54: 10 h", nlines_energy_tot, 0, 2000);
 void SaveEnergySpectrum(int run_start, int run_end, std::string out = ""){
-	TH1F* h_tot = new TH1F("h_all", "Mn-54: 10 h", 1000, 0, 2000);
+    ofstream energy_output;
+    energy_output.open("Energiespektrum_total.dat");
 	TCanvas* c = new TCanvas();
 	c->SetLogy();
 	c->SetLeftMargin(0.12);
@@ -312,17 +321,21 @@ void SaveEnergySpectrum(int run_start, int run_end, std::string out = ""){
 		f_out->Close();
 		delete f_out;
 	}
+    for (int p=0; p <= nlines_energy_tot; p++) {
+        energy_output << p << "\t" << h_tot -> GetBinContent(p) << endl;
+    }
+    energy_output.close();
 }
 
-//Daniel
+//Daniel: Gives possibility to integrate over x-Values in total energy spectrum
 
-void Integral(int xmin, int xmax)
+void IntegralEnergy(int xmin, int xmax)
 {
-
+    
     TAxis *axis = h_tot->GetXaxis();
     int bmin = axis->FindBin(xmin);
     int bmax = axis->FindBin(xmax);
     double integral = h_tot->Integral(bmin,bmax);
     cerr << integral << endl;
-
+    
 }
