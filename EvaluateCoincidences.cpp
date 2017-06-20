@@ -71,6 +71,8 @@ void LoadTree(std::string filename)
 }
 
 //Plots a set of individual events based on some attributes
+//Daniel: Also TH1F to compare ToA Values of certain columns. Seems to be a bug here
+//Daniel: Also added: couts to ensure it working. At the end it calculates runtime, which is really need, but i think we need more control
 void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumberOfEntries = -1, std::string _title = "")
 {
 	cout<<"begin program!"<<endl;
@@ -110,6 +112,8 @@ void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumbe
 	TH2F* pix = new TH2F("pixelmatrix", "", 256, -0.5,255.5,256,-0.5,255.5);
 	TH2D* pix_ToA = new TH2D("pixel_ToA", "", 256, -0.5,255.5,256,-0.5,255.5);
 	TH2F* pix_hits = new TH2F("pix_hits", "", 256,-0.5,255.5, 256,-0.5,255.5);
+    TH1D* pix_ToA_1D_bad = new TH1D("pixel_ToA bad","",256,-0.5,255.5);
+    TH1D* pix_Toa_1D_good = new TH1D("pixel_ToA good","",256,-0.5,255.5);
 
 	int numberOfEvents = 0; 
 	int number_pixels = 0;
@@ -118,6 +122,8 @@ void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumbe
 	double max_TOA;
 
 	t_data->Draw(">>myList", cuts.c_str(), "entryList");
+    
+    cout<<"Starting big loop now!" << endl;
 
 	for(unsigned int i = 0; i < myList->GetN(); i++)
 	{
@@ -126,7 +132,7 @@ void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumbe
 			t_data->GetEntry(myList->GetEntry(i));
 			cerr.precision(24);
 			if(minToA < min_TOA || i == 0){
-				min_TOA = minToA;
+                min_TOA = minToA;
 			}
 
 			numberOfEvents++;
@@ -145,6 +151,13 @@ void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumbe
 				dif = ToA[j] - minToA + 0.00001;
 				pix_ToA->Fill(PixX[j], PixY[j], dif);
 				pix_hits->Fill(PixX[j], PixY[j], 1);
+                if (j=191) {
+                    pix_ToA_1D_bad->Fill(PixY[j],dif);
+                }
+                if (j=189) {
+                    pix_Toa_1D_good->Fill(PixY[j],dif);
+                }
+                cout << "I'm filling histos. Right now i am at:" << j << endl;
 			}
 			if(i == eventNo_afterCut){break;}
 		}
@@ -183,6 +196,9 @@ void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumbe
 	pix->Draw("COLZ9");
 	c->cd(2);
 	pix_ToA->Draw("COLZ9");
+    
+    pix_Toa_1D_good->Draw();
+    pix_ToA_1D_bad->Draw();
 
 	time_t endtime = time(0);
 	cout<<"Found "<<numberOfEvents<<" Events! and number pixels = "<<number_pixels<<endl;
@@ -276,7 +292,15 @@ void ScatterPlotEnergiesCoincidenceGroups(std::string filename){
 	h_e->Draw("");
 }
 
-TH1F* PlotEnergySpectrum(std::string fn, int nbins = 1000, float xmin = 0, float xmax = 2000){
+
+//Daniel: nlines_energy_tot is for binning. OG:1000
+int nlines_energy_tot = 4000;
+//Daniel: max_energy_tot is maximum energy. OG:2000
+int max_energy_tot = 2000;
+
+
+//TH1F* PlotEnergySpectrum(std::string fn, int nbins = 1000, float xmin = 0, float xmax = 2000){
+TH1F* PlotEnergySpectrum(std::string fn, int nbins = 4000, float xmin = 0, float xmax = 2000){
 	TFile* f = new TFile(fn.c_str(), "OPEN");
 	TTree* t = (TTree*) f->Get("clusteredData");
 	TH1F* h = new TH1F("h", "", nbins, xmin, xmax);
@@ -289,8 +313,11 @@ TH1F* PlotEnergySpectrum(std::string fn, int nbins = 1000, float xmin = 0, float
 
 //Creates and saves the integrated energy spectrum
 //Daniel: Also introduces function to integrate over x-values. And prints histogram content into .dat-File
-int nlines_energy_tot = 1000;
-TH1F* h_tot = new TH1F("h_all", "Mn-54: 10 h", nlines_energy_tot, 0, 2000);
+
+
+
+
+TH1F* h_tot = new TH1F("h_all", "Mn-54: 10 h", nlines_energy_tot, 0, max_energy_tot);
 void SaveEnergySpectrum(int run_start, int run_end, std::string out = ""){
     ofstream energy_output;
     energy_output.open("Energiespektrum_total.dat");
@@ -322,7 +349,7 @@ void SaveEnergySpectrum(int run_start, int run_end, std::string out = ""){
 		delete f_out;
 	}
     for (int p=0; p <= nlines_energy_tot; p++) {
-        energy_output << p << "\t" << h_tot -> GetBinContent(p) << endl;
+        energy_output << p*(max_energy_tot/nlines_energy_tot) << "\t" << h_tot -> GetBinContent(p) << endl;
     }
     energy_output.close();
 }
@@ -339,3 +366,43 @@ void IntegralEnergy(int xmin, int xmax)
     cerr << integral << endl;
     
 }
+
+//Daniel: The SaveEnergySpectrum-function can sum up all runXX.root Files and evaluate them.
+// In the following section, the same tactic as used in this function will be used for PlotXYC with different, potentially interesting Cuts.
+
+/*
+void PlotSmallCoincidences(int run_start, int run_end, std::string out = "")
+{
+    TCanvas* c = new TCanvas();
+    c->SetLogy();
+    c->SetLeftMargin(0.12);
+    c->SetBottomMargin(0.12);
+    
+    TH1F* h_run;
+    
+    for(int i = run_start; i <= run_end; i++){
+        //TH1F* h = new TH1F("h" , "", 1000, 0, 2000);
+        std::stringstream filename;
+        filename << "run" << std::setw(2) << std::setfill('0') << i << ".root";
+        cerr << filename.str().c_str() << endl;
+        h_run = PlotEnergySpectrum(filename.str().c_str());
+        h_tot->Add(h_run);
+        h_run->Clear();
+    }
+    defineHistogram(h_tot, "Cluster volume (keV)", "No. of events", "Mn-54: 10 h", false);
+    
+    
+    h_tot->Draw();
+    if(out.compare("") != 0){
+        c->Print( (out+".pdf").c_str(), "pdf");
+        TFile* f_out = new TFile( (out+".root").c_str(), "RECREATE");
+        h_tot->Write("h_tot", TObject::kOverwrite);
+        f_out->Close();
+        delete f_out;
+    }
+}
+*/
+
+
+
+//-------------------------------------------------------------------------------------------
