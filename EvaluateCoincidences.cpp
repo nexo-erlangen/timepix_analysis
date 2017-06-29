@@ -62,17 +62,47 @@ void defineHistogram(TH1* h, std::string x, std::string y, std::string title, bo
 
 TFile* f;
 TTree* t_data;
+TTree* t_info;
 
 //Opens the ROOT file and loads the tree with the clustered data!
 void LoadTree(std::string filename)
 {
 	f = new TFile(filename.c_str(), "OPEN");
 	t_data = (TTree*) f->Get("clusteredData");
+   // cout << (TTree)f->Get(f->GetListOfKeys()->At(0)->GetName()) << endl;
+}
+
+//Daniel: Prints out Info
+
+void GiveInfo(std::string filename)
+{
+    f = new TFile(filename.c_str(), "OPEN");
+    t_info = (TTree*) f->Get("InfoTree_layer");
+    t_info->SetMakeClass(1);
+    
+    double serie_start_time;
+    double acq_time;
+    string chipboard_id;
+    double start_time;
+    double threshold;
+    
+    t_info->GetBranch("serie_start_time")->SetAddress(serie_start_time);
+    t_info->GetBranch("acq_time")->SetAddress(acq_time);
+    t_info->GetBranch("chipboard_id")->SetAddress(chipboard_id);
+    t_info->GetBranch("start_time")->SetAddress(start_time);
+    t_info->GetBranch("threshold")->SetAddress(threshold);
+    
+    cout << "Serie Start: " << serie_start_time << endl;
+    cout << "Acquisition time: " << acq_time << endl;
+    cout << "Chipboard: " << chipboard_id << endl;
+    cout << "Start time (differs from Serie Start!): " << start_time << endl;
+    cout << "Threshold: " << threshold << endl;
 }
 
 //Plots a set of individual events based on some attributes
 //Daniel: Also TH1F to compare ToA Values of certain columns. Seems to be a bug here
 //Daniel: Also added: couts to ensure it working. At the end it calculates runtime, which is really need, but i think we need more control
+//Daneil: Also added: Counting of cluster of conversion electrons
 void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumberOfEntries = -1, std::string _title = "")
 {
 	cout<<"begin program!"<<endl;
@@ -86,6 +116,8 @@ void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumbe
 
 	set_plot_style();
 
+    int countConversion = 0;
+    
 	const int maxNumberOfClusters = 65536;
 	int clstrSize;
 	short PixX[maxNumberOfClusters];
@@ -93,6 +125,7 @@ void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumbe
 	float ToT_keV[maxNumberOfClusters];
 	int ToT[maxNumberOfClusters];
 	double ToA[maxNumberOfClusters];
+    double clstrVolume_keV;
 	long int _eventNo;
 	if(t_data->GetListOfBranches()->Contains("ToT_keV")){ t_data->GetBranch("ToT_keV")->SetAddress(ToT_keV); energy_cali = true;}
 
@@ -108,12 +141,14 @@ void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumbe
 	t_data->GetBranch("ToT")->SetAddress(ToT);
 	t_data->GetBranch("min_ToA")->SetAddress(&minToA);
 	t_data->GetBranch("coincidence_group")->SetAddress(&coinc_group);
+    t_data->GetBranch("clstrVolume_keV")->SetAddress(clstrVolume_keV);
 
 	TH2F* pix = new TH2F("pixelmatrix", "", 256, -0.5,255.5,256,-0.5,255.5);
 	TH2D* pix_ToA = new TH2D("pixel_ToA", "", 256, -0.5,255.5,256,-0.5,255.5);
 	TH2F* pix_hits = new TH2F("pix_hits", "", 256,-0.5,255.5, 256,-0.5,255.5);
     TH1D* pix_ToA_1D_bad = new TH1D("pixel_ToA bad","",256,-0.5,255.5);
     TH1D* pix_Toa_1D_good = new TH1D("pixel_ToA good","",256,-0.5,255.5);
+    TH2D* pix_ToA_test = new TH2D("test","",256,-0.5,255.5,256,-0.5,255.5);
 
 	int numberOfEvents = 0; 
 	int number_pixels = 0;
@@ -125,6 +160,8 @@ void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumbe
     
     cout<<"Starting big loop now!" << endl;
 
+//Daniel: To solve offset in ToA histo, 'dif' wasn't plotted. Instead ToA[j] is now in.
+    
 	for(unsigned int i = 0; i < myList->GetN(); i++)
 	{
 		if(eventNo_afterCut == -1 || i == eventNo_afterCut)
@@ -151,21 +188,30 @@ void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumbe
 				dif = ToA[j] - minToA + 0.00001;
 				pix_ToA->Fill(PixX[j], PixY[j], dif);
 				pix_hits->Fill(PixX[j], PixY[j], 1);
-                if (j=191) {
-                    pix_ToA_1D_bad->Fill(PixY[j],dif);
-                }
-                if (j=189) {
-                    pix_Toa_1D_good->Fill(PixY[j],dif);
-                }
-                cout << "I'm filling histos. Right now i am at:" << j << endl;
+                pix_ToA_test->Fill(PixX[j],PixY[j], ToA[j]);
 			}
 			if(i == eventNo_afterCut){break;}
 		}
 		if(numberOfEvents >= _maximumNumberOfEntries && _maximumNumberOfEntries > 0){break;}
+        //cout << "I'm filling histos. Right now i am at " << i << "from " << myList.GetN() << endl;
+        
+        if (clstrSize>2 && 750<clstrVolume_keV<900) {
+            countConversion++;
+        }
+        
 	}
+    
+    for (int k=0; k<256; k++) {
+        double bad_bin = pix_ToA->GetBinContent(190,k);
+        double good_bin = pix_ToA->GetBinContent(189,k);
+        pix_ToA_1D_bad->Fill(k,bad_bin);
+        pix_Toa_1D_good->Fill(k,good_bin);
+    }
 
-	TCanvas* c = new TCanvas(("c_"+cuts).c_str(), "", 1300, 620);
-	c->Divide(2,1);
+	TCanvas* c = new TCanvas(("c_"+cuts).c_str(), "result canvas", 900, 1300);
+    TCanvas* c_toa = new TCanvas("ToA","control canvas",1300,620);
+	c->Divide(1,2);
+    c_toa->Divide(2,1);
 
 	for(short ic = 1; ic <= 2; ic++) 
 	{
@@ -197,17 +243,22 @@ void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumbe
 	c->cd(2);
 	pix_ToA->Draw("COLZ9");
     
+    c_toa->cd(1);
     pix_Toa_1D_good->Draw();
-    pix_ToA_1D_bad->Draw();
+    c_toa->cd(2);
+    pix_ToA_test->Draw("COLZ9");
 
 	time_t endtime = time(0);
 	cout<<"Found "<<numberOfEvents<<" Events! and number pixels = "<<number_pixels<<endl;
-	cout<<"runtime: "<<endtime-start_time;
+    cout<<"Found "<<countConversion<<" conversion electrons!"<<endl;
+	cout<<"runtime: "<<endtime-start_time << endl;
 }
 
 
 //Select coincidence group with 2 clusters and look at their energy and time.
+//Daniel: changed cuts to measure conversion electrons in coincidence with K-fluorescences. Plots are not to be trusted now!
 void ScatterPlotEnergiesCoincidenceGroups(std::string filename){
+    int countConversion =0;
 	f = new TFile(filename.c_str(), "OPEN");
 	TTree* t = (TTree*) f->Get("clusteredData");
 
@@ -250,12 +301,20 @@ void ScatterPlotEnergiesCoincidenceGroups(std::string filename){
 			size[1] = clstrSize;
 			time[1] = clstrTime;
 			energies[1] = clstrVolume_keV;
-
+/*
 			if(size[0] <= 2 && size[1] <= 2 && energies[0] + energies[1] < 18){
 				h_e1e2->Fill(energies[0], energies[1]);
 				h_dt->Fill(fabs(time[1] - time[0]));
 				h_e->Fill(energies[0] + energies[1]);
+                countConversion++;
 			}
+ */
+            if(size[0] <= 2 && size[1] > 2 && energies[0] <10 && 750< energies[1] < 900){
+                h_e1e2->Fill(energies[0], energies[1]);
+                h_dt->Fill(fabs(time[1] - time[0]));
+                h_e->Fill(energies[0] + energies[1]);
+                countConversion++;
+            }
 		}
 		else{
 			energies[0] = clstrVolume_keV;
@@ -290,6 +349,7 @@ void ScatterPlotEnergiesCoincidenceGroups(std::string filename){
 	h_e->GetXaxis()->SetTitleOffset(0.9);
 	h_e->GetYaxis()->SetTitleOffset(0.9);
 	h_e->Draw("");
+    cout << "Found " << countConversion << " conversion electrons in coincidence with fluorescences!" << endl;
 }
 
 
@@ -406,3 +466,5 @@ void PlotSmallCoincidences(int run_start, int run_end, std::string out = "")
 
 
 //-------------------------------------------------------------------------------------------
+
+
