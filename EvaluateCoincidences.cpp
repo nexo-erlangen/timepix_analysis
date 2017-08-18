@@ -101,8 +101,8 @@ void GiveInfo(std::string filename)
 
 //Plots a set of individual events based on some attributes
 //Daniel: Also TH1F to compare ToA Values of certain columns. Seems to be a bug here
-//Daniel: Also added: couts to ensure it working. At the end it calculates runtime, which is really need, but i think we need more control
-//Daneil: Also added: Counting of cluster of conversion electrons
+//Daniel: Also added: couts to ensure it working. At the end it calculates runtime, which is really neat, but i think we need more control
+//Daneil: Also added: Counting of cluster of conversion electrons; Method of counting is questionable, do not trust result; preferably use cuts in root-command and take NumberOfEvents
 void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumberOfEntries = -1, std::string _title = "")
 {
 	cout<<"begin program!"<<endl;
@@ -149,18 +149,33 @@ void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumbe
     TH1D* pix_ToA_1D_bad = new TH1D("pixel_ToA bad","",256,-0.5,255.5);
     TH1D* pix_Toa_1D_good = new TH1D("pixel_ToA good","",256,-0.5,255.5);
     TH2D* pix_ToA_test = new TH2D("test","",256,-0.5,255.5,256,-0.5,255.5);
+    TH2D* pix_ToA_test2 = new TH2D("test2","",256,-0.5,255.5,256,-0.5,255.5);
 
 	int numberOfEvents = 0; 
 	int number_pixels = 0;
 
 	double min_TOA;
 	double max_TOA;
+    
+    //ofstream strtoagood;
+    //strtoagood.open("toagood2.dat");
+    //ofstream strtoabad;
+    //strtoabad.open("toabad2.dat");
+    //ifstream toacorrect;
+    //toacorrect.open("toacorrect.dat");
+    //double toacorrection[255];
+    //for (int v=0; v<256; v++) {
+    //    toacorrect>>toacorrection[v];
+    //}
 
 	t_data->Draw(">>myList", cuts.c_str(), "entryList");
     
     cout<<"Starting big loop now!" << endl;
 
 //Daniel: To solve offset in ToA histo, 'dif' wasn't plotted. Instead ToA[j] is now in.
+//Daniel: Redaction: dif is now in again, as well as several testplots, but may be omitted for interest. :P
+    
+    double ToA_dif_raw[256][256] = { 0 };
     
 	for(unsigned int i = 0; i < myList->GetN(); i++)
 	{
@@ -185,8 +200,19 @@ void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumbe
 				}
 
 				double dif;
+                //if(PixX[j]==193 || PixX[j]==194){ToA[j] = ToA[j] - toacorrection[PixY[j]];}
 				dif = ToA[j] - minToA + 0.00001;
-				pix_ToA->Fill(PixX[j], PixY[j], dif);
+                
+                /*
+                if (PixX[j]==193 || PixX[j]==194) {
+                    pix_ToA->Fill(PixX[j], PixY[j], dif-toacorrection[PixY[j]]);
+                }
+                */
+               // else{
+                    pix_ToA->Fill(PixX[j], PixY[j], dif);
+                ToA_dif_raw[PixX[j]][PixY[j]] = ToA_dif_raw[PixX[j]][PixY[j]] + dif;
+               // }
+				
 				pix_hits->Fill(PixX[j], PixY[j], 1);
                 pix_ToA_test->Fill(PixX[j],PixY[j], ToA[j]);
 			}
@@ -195,19 +221,41 @@ void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumbe
 		if(numberOfEvents >= _maximumNumberOfEntries && _maximumNumberOfEntries > 0){break;}
         //cout << "I'm filling histos. Right now i am at " << i << "from " << myList.GetN() << endl;
         
-        if (clstrSize>2 && 750<clstrVolume_keV<900) {
+        if (clstrSize>2 && clstrVolume_keV>750 && clstrVolume_keV < 900) {
             countConversion++;
         }
         
 	}
     
+    cout << "Ending big loop now!" << endl;
+    
     for (int k=0; k<256; k++) {
-        double bad_bin = pix_ToA->GetBinContent(190,k);
-        double good_bin = pix_ToA->GetBinContent(189,k);
-        pix_ToA_1D_bad->Fill(k,bad_bin);
-        pix_Toa_1D_good->Fill(k,good_bin);
+        double bad_bin1 = pix_ToA->GetBinContent(193,k);
+        double bad_bin2 = pix_ToA->GetBinContent(194,k);
+        double good_bin1 = pix_ToA->GetBinContent(192,k);
+        double good_bin2 = pix_ToA->GetBinContent(195,k);
+        pix_ToA_1D_bad->Fill(k,bad_bin1);
+        pix_Toa_1D_good->Fill(k,good_bin1);
+        //strtoagood << good_bin2 << endl;
+        //strtoabad << bad_bin2 << endl;
     }
-
+    
+    //To do ToAcorrection in program:
+    for (int z=0; z<256 ; z++) {
+        double ex1 = ToA_dif_raw[192][z];
+        double ex2 = ToA_dif_raw[193][z];
+        double ex3 = (ToA_dif_raw[191][z] + ToA_dif_raw[194][z])/2;
+        ToA_dif_raw[192][z]= ToA_dif_raw[192][z] - (ex1 - ex3);
+        ToA_dif_raw[193][z]= ToA_dif_raw[193][z] - (ex2 - ex3);
+    }
+    
+    for (int m=0; m<256; m++) {
+        for (int n=0; n<256; n++) {
+            pix_ToA_test2->Fill(m, n, ToA_dif_raw[m][n]);
+        }
+    }
+    // -----
+    
 	TCanvas* c = new TCanvas(("c_"+cuts).c_str(), "result canvas", 900, 1300);
     TCanvas* c_toa = new TCanvas("ToA","control canvas",1300,620);
 	c->Divide(1,2);
@@ -241,17 +289,19 @@ void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumbe
 	c->cd(1);
 	pix->Draw("COLZ9");
 	c->cd(2);
-	pix_ToA->Draw("COLZ9");
+	pix_ToA_test2->Draw("COLZ9");
     
     c_toa->cd(1);
     pix_Toa_1D_good->Draw();
     c_toa->cd(2);
-    pix_ToA_test->Draw("COLZ9");
+    pix_ToA_1D_bad->Draw();
+    //strtoagood.close();
+    //strtoabad.close();
 
 	time_t endtime = time(0);
 	cout<<"Found "<<numberOfEvents<<" Events! and number pixels = "<<number_pixels<<endl;
     cout<<"Found "<<countConversion<<" conversion electrons!"<<endl;
-	cout<<"runtime: "<<endtime-start_time << endl;
+    cout<<"runtime: "<<endtime-start_time << endl;
 }
 
 
@@ -287,7 +337,7 @@ void ScatterPlotEnergiesCoincidenceGroups(std::string filename){
 	TH1F* h_dt = new TH1F("h_dt", "", 100, 0, 156);
 	TH1F* h_e = new TH1F("h_e", "", 150, 0, 150);
 	//scatter plot of energies of event 1 and event2 
-	TH2F* h_e1e2 = new TH2F("h_e1e2", "", 100, 0, 100, 100, 0, 100);
+	TH2F* h_e1e2 = new TH2F("h_e1e2", "", 1000, 0, 1000, 1000, 0, 1000);
 
 	long coinc_group_no_temp = -1;
 	//int maxEvents = 10000;
@@ -301,6 +351,9 @@ void ScatterPlotEnergiesCoincidenceGroups(std::string filename){
 			size[1] = clstrSize;
 			time[1] = clstrTime;
 			energies[1] = clstrVolume_keV;
+            
+//Daniel: HIER DIE CUTS FUER COINCIDENCES WOHOOO!!! :-< :-< :-< :-< :-< :-< :-< :-< :-< <--DAS SIND SCHEREN SCHNIP SCHNIP
+            
 /*
 			if(size[0] <= 2 && size[1] <= 2 && energies[0] + energies[1] < 18){
 				h_e1e2->Fill(energies[0], energies[1]);
@@ -309,7 +362,7 @@ void ScatterPlotEnergiesCoincidenceGroups(std::string filename){
                 countConversion++;
 			}
  */
-            if(size[0] <= 2 && size[1] > 2 && energies[0] <10 && 750< energies[1] < 900){
+            if(size[0] <= 2 && size[1] > 2 && energies[0] <10 && energies[1] > 750 && energies[1] < 900){
                 h_e1e2->Fill(energies[0], energies[1]);
                 h_dt->Fill(fabs(time[1] - time[0]));
                 h_e->Fill(energies[0] + energies[1]);
@@ -423,10 +476,11 @@ void IntegralEnergy(int xmin, int xmax)
     int bmin = axis->FindBin(xmin);
     int bmax = axis->FindBin(xmax);
     double integral = h_tot->Integral(bmin,bmax);
-    cerr << integral << endl;
+    cout << integral << endl;
     
 }
 
+//Daniel: RETRACTEDRETRACTEDRETRACTEDRETRACTED
 //Daniel: The SaveEnergySpectrum-function can sum up all runXX.root Files and evaluate them.
 // In the following section, the same tactic as used in this function will be used for PlotXYC with different, potentially interesting Cuts.
 
@@ -463,7 +517,7 @@ void PlotSmallCoincidences(int run_start, int run_end, std::string out = "")
 }
 */
 
-
+//Daniel: RETRACTEDRETRACTEDRETRACTEDRETRACTED
 
 //-------------------------------------------------------------------------------------------
 
