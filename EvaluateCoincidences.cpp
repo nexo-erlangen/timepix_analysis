@@ -242,11 +242,11 @@ void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumbe
     
     //To do ToAcorrection in program:
     for (int z=0; z<256 ; z++) {
-        double ex1 = ToA_dif_raw[192][z];
-        double ex2 = ToA_dif_raw[193][z];
-        double ex3 = (ToA_dif_raw[191][z] + ToA_dif_raw[194][z])/2;
-        ToA_dif_raw[192][z]= ToA_dif_raw[192][z] - (ex1 - ex3);
-        ToA_dif_raw[193][z]= ToA_dif_raw[193][z] - (ex2 - ex3);
+        double ex3 = ((ToA_dif_raw[192][z] + ToA_dif_raw[193][z])/2) - ((ToA_dif_raw[191][z] + ToA_dif_raw[194][z])/2); // Mittelwert Differenz --> "mittlerer Offset"
+        ToA_dif_raw[192][z]= ToA_dif_raw[192][z] - ex3;
+        ToA_dif_raw[193][z]= ToA_dif_raw[193][z] - ex3;
+        //ToA_dif_raw[192][z]= ToA_dif_raw[191][z];
+        //ToA_dif_raw[193][z]= ToA_dif_raw[194][z];
     }
     
     for (int m=0; m<256; m++) {
@@ -302,6 +302,7 @@ void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumbe
 	cout<<"Found "<<numberOfEvents<<" Events! and number pixels = "<<number_pixels<<endl;
     cout<<"Found "<<countConversion<<" conversion electrons!"<<endl;
     cout<<"runtime: "<<endtime-start_time << endl;
+    cout<<"Disclaimer: In ToA plot, a thin stripe (2 pixel rows) at around x=190 is standing out. The source of this problem has yet to be determined."<<endl;
 }
 
 
@@ -520,5 +521,6 @@ void PlotSmallCoincidences(int run_start, int run_end, std::string out = "")
 //Daniel: RETRACTEDRETRACTEDRETRACTEDRETRACTED
 
 //-------------------------------------------------------------------------------------------
+
 
 
