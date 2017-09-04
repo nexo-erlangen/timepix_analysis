@@ -116,7 +116,7 @@ void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumbe
 
 	set_plot_style();
 
-    int countConversion = 0;
+    //int countConversion = 0;
     
 	const int maxNumberOfClusters = 65536;
 	int clstrSize;
@@ -221,10 +221,10 @@ void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumbe
 		if(numberOfEvents >= _maximumNumberOfEntries && _maximumNumberOfEntries > 0){break;}
         //cout << "I'm filling histos. Right now i am at " << i << "from " << myList.GetN() << endl;
         
-        if (clstrSize>2 && clstrVolume_keV>750 && clstrVolume_keV < 900) {
+      /*  if (clstrSize>2 && clstrVolume_keV>750 && clstrVolume_keV < 900) {
             countConversion++;
         }
-        
+        */
 	}
     
     cout << "Ending big loop now!" << endl;
@@ -300,7 +300,7 @@ void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumbe
 
 	time_t endtime = time(0);
 	cout<<"Found "<<numberOfEvents<<" Events! and number pixels = "<<number_pixels<<endl;
-    cout<<"Found "<<countConversion<<" conversion electrons!"<<endl;
+    //cout<<"Found "<<countConversion<<" conversion electrons!"<<endl;
     cout<<"runtime: "<<endtime-start_time << endl;
     cout<<"Disclaimer: In ToA plot, a thin stripe (2 pixel rows) at around x=190 is standing out. The source of this problem has yet to be determined."<<endl;
 }
@@ -521,6 +521,5 @@ void PlotSmallCoincidences(int run_start, int run_end, std::string out = "")
 //Daniel: RETRACTEDRETRACTEDRETRACTEDRETRACTED
 
 //-------------------------------------------------------------------------------------------
-
 
 
