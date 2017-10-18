@@ -102,7 +102,7 @@ void GiveInfo(std::string filename)
 //Plots a set of individual events based on some attributes
 //Daniel: Also TH1F to compare ToA Values of certain columns. Seems to be a bug here
 //Daniel: Also added: couts to ensure it working. At the end it calculates runtime, which is really neat, but i think we need more control
-//Daneil: Also added: Counting of cluster of conversion electrons; Method of counting is questionable, do not trust result; preferably use cuts in root-command and take NumberOfEvents
+//Daniel: Also added: Counting of cluster of conversion electrons; Method of counting is questionable, do not trust result; preferably use cuts in root-command and take NumberOfEvents
 void PlotXYC(std::string cuts = "", int eventNo_afterCut = -1, int _maximumNumberOfEntries = -1, std::string _title = "")
 {
 	cout<<"begin program!"<<endl;
@@ -336,7 +336,7 @@ void ScatterPlotEnergiesCoincidenceGroups(std::string filename){
 	
 	//Define the histrograms
 	TH1F* h_dt = new TH1F("h_dt", "", 100, 0, 156);
-	TH1F* h_e = new TH1F("h_e", "", 150, 0, 150);
+	TH1F* h_e = new TH1F("h_e", "", 1500, 0, 1500);
 	//scatter plot of energies of event 1 and event2 
 	TH2F* h_e1e2 = new TH2F("h_e1e2", "", 1000, 0, 1000, 1000, 0, 1000);
 
@@ -363,7 +363,7 @@ void ScatterPlotEnergiesCoincidenceGroups(std::string filename){
                 countConversion++;
 			}
  */
-            if(size[0] <= 2 && size[1] > 2 && energies[0] <10 && energies[1] > 750 && energies[1] < 900){
+            if(size[0] == 2 && size[1] > 2 && energies[0] <20 && energies[1] > 750 && energies[1] < 900){
                 h_e1e2->Fill(energies[0], energies[1]);
                 h_dt->Fill(fabs(time[1] - time[0]));
                 h_e->Fill(energies[0] + energies[1]);
@@ -408,13 +408,13 @@ void ScatterPlotEnergiesCoincidenceGroups(std::string filename){
 
 
 //Daniel: nlines_energy_tot is for binning. OG:1000
-int nlines_energy_tot = 4000;
+int nlines_energy_tot = 2000;
 //Daniel: max_energy_tot is maximum energy. OG:2000
 int max_energy_tot = 2000;
 
 
 //TH1F* PlotEnergySpectrum(std::string fn, int nbins = 1000, float xmin = 0, float xmax = 2000){
-TH1F* PlotEnergySpectrum(std::string fn, int nbins = 4000, float xmin = 0, float xmax = 2000){
+TH1F* PlotEnergySpectrum(std::string fn, int nbins = nlines_energy_tot, float xmin = 0, float xmax = 2000){
 	TFile* f = new TFile(fn.c_str(), "OPEN");
 	TTree* t = (TTree*) f->Get("clusteredData");
 	TH1F* h = new TH1F("h", "", nbins, xmin, xmax);
